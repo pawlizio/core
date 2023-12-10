@@ -494,6 +494,10 @@ ZEROCONF = {
                 "vendor": "synology*",
             },
         },
+        {
+            "domain": "velux",
+            "name": "velux_klf_lan*",
+        },
     ],
     "_hue._tcp.local.": [
         {

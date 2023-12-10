@@ -6,6 +6,7 @@
         "title": "Configure the KLF200 Gateway",
         "description": "Please enter your password, you will find it on the backside of the KLF200",
         "data": {
+          "name": "[%key:common::config_flow::data::name%]",
           "host": "[%key:common::config_flow::data::host%]",
           "password": "[%key:common::config_flow::data::password%]"
         }
@@ -19,6 +20,46 @@
     "abort": {
       "no_devices_found": "[%key:common::config_flow::abort::no_devices_found%]",
       "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+    }
+  },
+  "services": {
+    "reboot_gateway": {
+      "name": "Reboot gateway",
+      "description": "Reboots the KLF200 gateway."
+    },
+    "set_cover_position": {
+      "name": "Set position",
+      "description": "Move to specific position all or specified cover.",
+      "fields": {
+        "position": {
+          "name": "Position",
+          "description": "Desired position of the cover."
+        },
+        "velocity": {
+          "name": "Velocity",
+          "description": "Desired velocity percentage of the movement."
+        }
+      }
+    },
+    "open_cover": {
+      "name": "Open",
+      "description": "Open all or specified cover.",
+      "fields": {
+        "velocity": {
+          "name": "Velocity",
+          "description": "Desired velocity percentage of the movement."
+        }
+      }
+    },
+    "close_cover": {
+      "name": "Close",
+      "description": "Close all or specified cover.",
+      "fields": {
+        "velocity": {
+          "name": "Velocity",
+          "description": "Desired velocity percentage of the movement."
+        }
+      }
     }
   }
 }

@@ -1,14 +1,14 @@
 """Velux component config flow."""
 # https://developers.home-assistant.io/docs/config_entries_config_flow_handler#defining-your-config-flow
-import logging
 from typing import Any
 
 from pyvlx import PyVLX, PyVLXException
 import voluptuous as vol
 
 from homeassistant.components.zeroconf import ZeroconfServiceInfo
-from homeassistant.config_entries import ConfigFlow, FlowResult
-from homeassistant.const import CONF_HOST, CONF_PASSWORD
+from homeassistant.config_entries import ConfigFlow
+from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD
+from homeassistant.data_entry_flow import FlowResult
 
 from .const import DOMAIN
 
@@ -23,7 +23,8 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         """Initialize the Velux flow."""
-        self._host: str = None
+        self._host: str | None = None
+        self._name: str | None = None
 
     async def async_step_import(
         self, user_input: dict[str, Any] | None = None
@@ -37,8 +38,7 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
         """Handle configuration via user input."""
         errors = {}
         if user_input is not None:
-            await self.async_set_unique_id(user_input[CONF_HOST])
-            self._abort_if_unique_id_configured()
+            self._async_abort_entries_match({CONF_HOST: user_input[CONF_HOST]})
             pyvlx: PyVLX = PyVLX(
                 host=user_input[CONF_HOST],
                 password=user_input[CONF_PASSWORD],
@@ -47,7 +47,7 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
                 await pyvlx.connect()
                 await pyvlx.disconnect()
                 return self.async_create_entry(
-                    title=user_input[CONF_HOST],
+                    title=user_input[CONF_NAME],
                     data={
                         CONF_HOST: user_input[CONF_HOST],
                         CONF_PASSWORD: user_input[CONF_PASSWORD],
@@ -57,11 +57,11 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_auth"
             except OSError:
                 errors["base"] = "invalid_host"
-            else:
-                errors["base"] = "cannot_connect"
+            errors["base"] = "cannot_connect"
 
         data_schema = vol.Schema(
             {
+                vol.Required(CONF_NAME, default=self._name): str,
                 vol.Required(CONF_HOST, default=self._host): str,
                 vol.Required(CONF_PASSWORD): str,
             }
@@ -71,9 +71,7 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="user", data_schema=data_schema, errors=errors
         )
 
-    async def async_step_unignore(
-        self, user_input: dict[str, Any] | None
-    ) -> FlowResult:
+    async def async_step_unignore(self, user_input: dict[str, Any]) -> FlowResult:
         """Rediscover a previously ignored discover."""
         unique_id = user_input["unique_id"]
         await self.async_set_unique_id(unique_id)
@@ -83,12 +81,9 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
         self, discovery_info: ZeroconfServiceInfo
     ) -> FlowResult:
         """Handle discovery by zeroconf."""
-        if (
-            discovery_info is None
-            or not discovery_info.hostname
-            or not discovery_info.hostname.startswith("VELUX_KLF_LAN")
-        ):
+        if not discovery_info.name.startswith("VELUX_KLF_LAN"):
             return self.async_abort(reason="no_devices_found")
-        await self.async_set_unique_id(discovery_info.host)
+        self._async_abort_entries_match({CONF_HOST: discovery_info.host})
         self._host = discovery_info.host
+        self._name = discovery_info.name.replace("._http._tcp.local.", "")
         return await self.async_step_user()
