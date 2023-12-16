@@ -4,29 +4,29 @@ import logging
 from pyvlx import PyVLX
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
-from .const import (
-    CONF_HEARTBEAT_INTERVAL,
-    CONF_HEARTBEAT_LOAD_ALL_STATES,
-    DOMAIN,
-    PLATFORMS,
-)
+from .const import DOMAIN, PLATFORMS
 
 _LOGGER = logging.getLogger(__name__)
 
-# Support for current yaml configuration during migration phase.
 CONFIG_SCHEMA = vol.Schema(
-    {
-        DOMAIN: vol.Schema(
-            {vol.Required(CONF_HOST): cv.string, vol.Required(CONF_PASSWORD): cv.string}
-        )
-    },
+    vol.All(
+        cv.deprecated(DOMAIN),
+        {
+            DOMAIN: vol.Schema(
+                {
+                    vol.Required(CONF_HOST): cv.string,
+                    vol.Required(CONF_PASSWORD): cv.string,
+                }
+            )
+        },
+    ),
     extra=vol.ALLOW_EXTRA,
 )
 
@@ -34,12 +34,9 @@ CONFIG_SCHEMA = vol.Schema(
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up velux component via configuration.yaml."""
     if DOMAIN in config:
-        _LOGGER.warning(
-            "Please note that configuration of integrations which communicate to external devices should no longer use configuration.yaml setup. Your configuration data has been transferred to integration flow used on the GUI Integration page. You can safely remove your velux entry from configuration.yaml"
-        )
         hass.async_create_task(
             hass.config_entries.flow.async_init(
-                DOMAIN, context={"source": "import"}, data=config[DOMAIN]
+                DOMAIN, context={"source": SOURCE_IMPORT}, data=config[DOMAIN]
             )
         )
     return True
@@ -52,10 +49,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     pyvlx_args = {
         "host": entry.data[CONF_HOST],
         "password": entry.data[CONF_PASSWORD],
-        "heartbeat_interval": entry.data.get(CONF_HEARTBEAT_INTERVAL, 30),
-        "heartbeat_load_all_states": entry.data.get(
-            CONF_HEARTBEAT_LOAD_ALL_STATES, True
-        ),
     }
     pyvlx: PyVLX = PyVLX(**pyvlx_args)
     try:

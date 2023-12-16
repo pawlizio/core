@@ -1,8 +1,12 @@
 """Fixtures for the Velbus tests."""
 from collections.abc import Generator
-from unittest.mock import MagicMock, patch
+from typing import Any
+from unittest.mock import AsyncMock, patch
 
 import pytest
+from pyvlx import PyVLX
+from pyvlx.nodes import Nodes
+from pyvlx.scenes import Scenes
 
 from homeassistant.components.velux.const import DOMAIN
 from homeassistant.const import CONF_HOST, CONF_PASSWORD
@@ -14,10 +18,20 @@ from .const import HOST, PASSWORD
 from tests.common import MockConfigEntry
 
 
+class PyVLXMock(AsyncMock):
+    """Pyvlx mock class."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize pyvlx mock."""
+        super().__init__(*args, **kwargs)
+        self.nodes = AsyncMock(spec=Nodes)
+        self.scenes = AsyncMock(spec=Scenes)
+
+
 @pytest.fixture(name="pyvlx")
-def mock_pyvlx() -> Generator[MagicMock, None, None]:
+def mock_pyvlx() -> Generator[AsyncMock, None, None]:
     """Mock a successful velux gateway."""
-    with patch("homeassistant.components.velux.PyVLX", autospec=True) as pyvlx:
+    with patch("homeassistant.components.velux.PyVLX", spec=PyVLX) as pyvlx:
         yield pyvlx
 
 

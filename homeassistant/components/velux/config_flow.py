@@ -7,7 +7,7 @@ import voluptuous as vol
 
 from homeassistant.components.zeroconf import ZeroconfServiceInfo
 from homeassistant.config_entries import ConfigFlow
-from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD
+from homeassistant.const import CONF_HOST, CONF_PASSWORD
 from homeassistant.data_entry_flow import FlowResult
 
 from .const import DOMAIN
@@ -24,13 +24,10 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         """Initialize the Velux flow."""
         self._host: str | None = None
-        self._name: str | None = None
 
-    async def async_step_import(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    async def async_step_import(self, data: dict[str, Any] | None = None) -> FlowResult:
         """Handle configuration by yaml file."""
-        return await self.async_step_user(user_input)
+        return await self.async_step_user(user_input=data)
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -47,21 +44,21 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
                 await pyvlx.connect()
                 await pyvlx.disconnect()
                 return self.async_create_entry(
-                    title=user_input[CONF_NAME],
+                    title=user_input[CONF_HOST],
                     data={
                         CONF_HOST: user_input[CONF_HOST],
                         CONF_PASSWORD: user_input[CONF_PASSWORD],
                     },
                 )
-            except PyVLXException:
-                errors["base"] = "invalid_auth"
+            except ConnectionAbortedError:
+                errors["base"] = "cannot_connect"
             except OSError:
                 errors["base"] = "invalid_host"
-            errors["base"] = "cannot_connect"
+            except PyVLXException:
+                errors["base"] = "invalid_auth"
 
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_NAME, default=self._name): str,
                 vol.Required(CONF_HOST, default=self._host): str,
                 vol.Required(CONF_PASSWORD): str,
             }
@@ -85,5 +82,4 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="no_devices_found")
         self._async_abort_entries_match({CONF_HOST: discovery_info.host})
         self._host = discovery_info.host
-        self._name = discovery_info.name.replace("._http._tcp.local.", "")
         return await self.async_step_user()
