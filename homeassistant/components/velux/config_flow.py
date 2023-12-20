@@ -70,8 +70,7 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_unignore(self, user_input: dict[str, Any]) -> FlowResult:
         """Rediscover a previously ignored discover."""
-        unique_id = user_input["unique_id"]
-        await self.async_set_unique_id(unique_id)
+        self._async_abort_entries_match({CONF_HOST: user_input[CONF_HOST]})
         return await self.async_step_user()
 
     async def async_step_zeroconf(
