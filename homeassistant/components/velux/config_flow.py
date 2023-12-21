@@ -70,15 +70,23 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_unignore(self, user_input: dict[str, Any]) -> FlowResult:
         """Rediscover a previously ignored discover."""
-        self._async_abort_entries_match({CONF_HOST: user_input[CONF_HOST]})
+        unique_id = user_input["unique_id"]
+        await self.async_set_unique_id(unique_id)
         return await self.async_step_user()
 
     async def async_step_zeroconf(
         self, discovery_info: ZeroconfServiceInfo
     ) -> FlowResult:
         """Handle discovery by zeroconf."""
-        if not discovery_info.name.startswith("VELUX_KLF_LAN"):
-            return self.async_abort(reason="no_devices_found")
-        self._async_abort_entries_match({CONF_HOST: discovery_info.host})
+        hostname = discovery_info.hostname.replace(".local.", "")
+        await self.async_set_unique_id(hostname)
+        self._abort_if_unique_id_configured(updates={CONF_HOST: discovery_info.host})
+
+        # Check if config_entry exists already without unigue_id configured.
+        for entry in self.hass.config_entries.async_entries(DOMAIN):
+            if entry.data[CONF_HOST] == discovery_info.host and entry.unique_id is None:
+                entry.unique_id = hostname
+                return self.async_abort(reason="already_configured")
+
         self._host = discovery_info.host
         return await self.async_step_user()
