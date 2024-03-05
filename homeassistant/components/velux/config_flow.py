@@ -94,7 +94,9 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_unignore(self, user_input: dict[str, Any]) -> FlowResult:
+    async def async_step_unignore(
+        self, user_input: dict[str, Any]
+    ) -> config_entries.ConfigFlowResult:
         """Rediscover a previously ignored discover."""
         unique_id = user_input["unique_id"]
         await self.async_set_unique_id(unique_id)
@@ -102,7 +104,7 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_zeroconf(
         self, discovery_info: ZeroconfServiceInfo
-    ) -> FlowResult:
+    ) -> config_entries.ConfigFlowResult:
         """Handle discovery by zeroconf."""
         hostname = discovery_info.hostname.replace(".local.", "")
         await self.async_set_unique_id(hostname)
