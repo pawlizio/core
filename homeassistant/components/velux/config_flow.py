@@ -43,12 +43,13 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             self._async_abort_entries_match({CONF_HOST: user_input[CONF_HOST]})
-            for host in self.hosts:
-                if user_input[CONF_HOST] == host.ip_address:  # type: ignore[union-attr]
-                    await self.async_set_unique_id(host.hostname)  # type: ignore[union-attr]
-                    self._abort_if_unique_id_configured(
-                        updates={CONF_HOST: host.ip_address}  # type: ignore[union-attr]
-                    )
+            if self.hosts is not None:
+                for host in self.hosts:
+                    if user_input[CONF_HOST] == host.ip_address:  # type: ignore[union-attr]
+                        await self.async_set_unique_id(host.hostname)  # type: ignore[union-attr]
+                        self._abort_if_unique_id_configured(
+                            updates={CONF_HOST: host.ip_address}  # type: ignore[union-attr]
+                        )
 
             pyvlx = PyVLX(
                 host=user_input[CONF_HOST], password=user_input[CONF_PASSWORD]
