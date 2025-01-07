@@ -143,12 +143,10 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
         hostname = (
             discovery_info.hostname.replace(".local.", "").upper().replace("LAN_", "")
         )
-        title = f"{hostname} ({discovery_info.ip_address})"
         await self.async_set_unique_id(hostname)
         self._abort_if_unique_id_configured(
             updates={
                 CONF_HOST: discovery_info.host,
-                "title": title,
             }
         )
 
@@ -158,7 +156,6 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
                 self.hass.config_entries.async_update_entry(
                     entry=entry,
                     unique_id=hostname,
-                    title=title,
                 )
                 return self.async_abort(reason="already_configured")
 
