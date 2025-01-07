@@ -53,12 +53,14 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         aiozc = await zeroconf.async_get_async_instance(self.hass)
         vd: VeluxDiscovery = VeluxDiscovery(zeroconf=aiozc)
-        if await vd.async_discover_hosts(timeout=3, expected_hosts=1):
-            for new_host in vd.hosts:
-                if not any(host.hostname == new_host.hostname for host in self.hosts):
-                    self.hosts.append(new_host)
-            return await self.async_step_auth()
-        return self.async_abort(reason="no_hosts_found")
+        if not await vd.async_discover_hosts(timeout=3, expected_hosts=1):
+            return self.async_abort(reason="no_hosts_found")
+
+        for new_host in vd.hosts:
+            if not any(host.hostname == new_host.hostname for host in self.hosts):
+                self.hosts.append(new_host)
+
+        return await self.async_step_auth()
 
     async def async_step_auth(
         self, user_input: dict[str, str] | None = None
