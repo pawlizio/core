@@ -66,6 +66,8 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, str] | None = None
     ) -> ConfigFlowResult:
         """Authenticate to a KLF200."""
+        for host in self.hosts:
+            LOGGER.debug("Discovered host: %s", host)
         errors: dict[str, str] = {}
         if user_input is not None:
             self._async_abort_entries_match({CONF_HOST: user_input[CONF_HOST]})
@@ -74,9 +76,7 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
                 for host in self.hosts:
                     if user_input[CONF_HOST] == host.ip_address:
                         await self.async_set_unique_id(
-                            host.hostname.replace(
-                                "LAN_", ""
-                            ),  # KLF200 hostname sometimes is reported as VELUX_KLF200_LAN_XXXX, sometime VELUX_KLF200_XXXX, while XXXX are last 4 digits of MAC address
+                            host.hostname,
                             raise_on_progress=False,
                         )
                         self._abort_if_unique_id_configured()
@@ -140,9 +140,7 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Handle discovery by zeroconf."""
         LOGGER.debug("Discovered via Zeroconf with info: %s", discovery_info)
-        hostname = (
-            discovery_info.hostname.replace(".local.", "").upper().replace("LAN_", "")
-        )
+        hostname = discovery_info.hostname.replace(".local.", "").upper()
         await self.async_set_unique_id(hostname)
         self._abort_if_unique_id_configured(
             updates={
@@ -171,7 +169,7 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Handle discovery by DHCP."""
         LOGGER.debug("Discovered via DHCP with info: %s", discovery_info)
-        hostname = discovery_info.hostname.upper().replace("LAN_", "")
+        hostname = discovery_info.hostname.upper()
         mac = format_mac(discovery_info.macaddress)
         await self.async_set_unique_id(hostname)
         self._abort_if_unique_id_configured(
