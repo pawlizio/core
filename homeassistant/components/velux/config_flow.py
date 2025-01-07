@@ -30,11 +30,8 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
     MINOR_VERSION = 2
-
-    def __init__(self) -> None:
-        """Initialize the config flow."""
-        self._task: asyncio.Task | None = None
-        self.hosts: list[VeluxHost] = []
+    _task: asyncio.Task | None = None
+    hosts: list[VeluxHost] = []
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -49,7 +46,11 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_discover(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Discover a KLF200."""
+        """Discover a KLF200.
+
+        This step has been added, as the KLF200 doos not reliably respond on mdns requests used by zeroconf,
+        probably this is the case if one multicast massage contains several requests for more than 1 service_type.
+        """
         aiozc = await zeroconf.async_get_async_instance(self.hass)
         vd: VeluxDiscovery = VeluxDiscovery(zeroconf=aiozc)
         if await vd.async_discover_hosts(timeout=3, expected_hosts=1):
@@ -131,12 +132,6 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=data_schema,
             errors=errors,
         )
-
-    async def async_step_unignore(self, user_input: dict[str, Any]) -> ConfigFlowResult:
-        """Rediscover a previously ignored discover."""
-        unique_id = user_input["unique_id"]
-        await self.async_set_unique_id(unique_id)
-        return await self.async_step_user()
 
     async def async_step_zeroconf(
         self, discovery_info: ZeroconfServiceInfo
