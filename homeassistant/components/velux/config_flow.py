@@ -66,8 +66,6 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, str] | None = None
     ) -> ConfigFlowResult:
         """Authenticate to a KLF200."""
-        for host in self.hosts:
-            LOGGER.debug("Discovered host: %s", host)
         errors: dict[str, str] = {}
         if user_input is not None:
             self._async_abort_entries_match({CONF_HOST: user_input[CONF_HOST]})
