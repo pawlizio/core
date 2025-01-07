@@ -48,7 +48,7 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Discover a KLF200.
 
-        This step has been added, as the KLF200 doos not reliably respond on mdns requests used by zeroconf,
+        This step has been added, as the KLF200 does not reliably respond on mdns requests used by zeroconf,
         probably this is the case if one multicast massage contains several requests for more than 1 service_type.
         """
         aiozc = await zeroconf.async_get_async_instance(self.hass)
