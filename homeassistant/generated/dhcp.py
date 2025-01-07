@@ -1112,6 +1112,11 @@ DHCP: Final[list[dict[str, str | bool]]] = [
         "macaddress": "74ACB9*",
     },
     {
+        "domain": "velux",
+        "hostname": "velux_klf_lan*",
+        "macaddress": "646184*",
+    },
+    {
         "domain": "verisure",
         "macaddress": "0023C1*",
     },

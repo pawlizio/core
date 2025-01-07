@@ -6802,7 +6802,6 @@
       "iot_class": "local_push"
     },
     "velux": {
-      "name": "Velux",
       "integration_type": "hub",
       "config_flow": true,
       "iot_class": "local_polling"
@@ -7581,6 +7580,7 @@
     "trend",
     "uptime",
     "utility_meter",
+    "velux",
     "version",
     "waze_travel_time",
     "workday",

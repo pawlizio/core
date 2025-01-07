@@ -1,30 +1,28 @@
 """Config flow for Velux integration."""
 
+import asyncio
+from collections.abc import Sequence
+from typing import Any
+
 from pyvlx import PyVLX, PyVLXException
 from pyvlx.discovery import VeluxDiscovery, VeluxHost
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.components import zeroconf
+from homeassistant.components.dhcp import DhcpServiceInfo
 from homeassistant.components.zeroconf import ZeroconfServiceInfo
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_PASSWORD
 import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.issue_registry import IssueSeverity, async_create_issue
+from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.selector import (
+    SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
 )
 
 from .const import DOMAIN, LOGGER
-
-DATA_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_HOST): cv.string,
-        vol.Required(CONF_PASSWORD): cv.string,
-    }
-)
 
 
 class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -33,24 +31,55 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
     MINOR_VERSION = 2
 
-    hosts: list[VeluxHost] = []
+    def __init__(self) -> None:
+        """Initialize the config flow."""
+        self._task: asyncio.Task | None = None
+        self.hosts: list[VeluxHost] = []
 
     async def async_step_user(
-        self, user_input: dict[str, str] | None = None
+        self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle the initial step."""
-        errors: dict[str, str] = {}
 
+        return self.async_show_menu(
+            step_id="user",
+            menu_options=["discover", "auth"],
+        )
+
+    async def async_step_discover(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Discover a KLF200."""
+        aiozc = await zeroconf.async_get_async_instance(self.hass)
+        vd: VeluxDiscovery = VeluxDiscovery(zeroconf=aiozc)
+        if await vd.async_discover_hosts(timeout=3, expected_hosts=1):
+            for new_host in vd.hosts:
+                if not any(host.hostname == new_host.hostname for host in self.hosts):
+                    self.hosts.append(new_host)
+            return await self.async_step_auth()
+        return self.async_abort(reason="no_hosts_found")
+
+    async def async_step_auth(
+        self, user_input: dict[str, str] | None = None
+    ) -> ConfigFlowResult:
+        """Authenticate to a KLF200."""
+        errors: dict[str, str] = {}
         if user_input is not None:
             self._async_abort_entries_match({CONF_HOST: user_input[CONF_HOST]})
+            title: str = user_input[CONF_HOST]
             if self.hosts:
                 for host in self.hosts:
                     if user_input[CONF_HOST] == host.ip_address:
-                        await self.async_set_unique_id(host.hostname)
-                        self._abort_if_unique_id_configured(
-                            updates={CONF_HOST: host.ip_address}
+                        await self.async_set_unique_id(
+                            host.hostname.replace(
+                                "LAN_", ""
+                            ),  # KLF200 hostname sometimes is reported as VELUX_KLF200_LAN_XXXX, sometime VELUX_KLF200_XXXX, while XXXX are last 4 digits of MAC address
+                            raise_on_progress=False,
                         )
-
+                        self._abort_if_unique_id_configured()
+                        title = (
+                            f"{host.hostname.replace('LAN_', '')} ({host.ip_address})"
+                        )
             pyvlx = PyVLX(
                 host=user_input[CONF_HOST], password=user_input[CONF_PASSWORD]
             )
@@ -65,23 +94,24 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "unknown"
             else:
                 return self.async_create_entry(
-                    title=user_input[CONF_HOST],
+                    title=title,
                     data=user_input,
                 )
 
-        if not self.hosts:
-            aiozc = await zeroconf.async_get_async_instance(self.hass)
-            vd: VeluxDiscovery = VeluxDiscovery(zeroconf=aiozc)
-            if await vd.async_discover_hosts(expected_hosts=1):
-                self.hosts = vd.hosts  # type: ignore[assignment]
-
         if self.hosts:
+            options: Sequence[SelectOptionDict] = [
+                {
+                    "label": f"{host.hostname.replace("LAN_", "")} ({host.ip_address})",
+                    "value": host.ip_address,
+                }
+                for host in self.hosts
+            ]
             data_schema = vol.Schema(
                 {
                     vol.Required(CONF_HOST): SelectSelector(
                         SelectSelectorConfig(
-                            options=[host.ip_address for host in self.hosts],
-                            custom_value=True,
+                            options=options,
+                            custom_value=False,
                             mode=SelectSelectorMode.DROPDOWN,
                         )
                     ),
@@ -89,10 +119,15 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
                 }
             )
         else:
-            data_schema = self.add_suggested_values_to_schema(DATA_SCHEMA, user_input)
+            data_schema = vol.Schema(
+                {
+                    vol.Required(CONF_HOST): cv.string,
+                    vol.Required(CONF_PASSWORD): cv.string,
+                }
+            )
 
         return self.async_show_form(
-            step_id="user",
+            step_id="auth",
             data_schema=data_schema,
             errors=errors,
         )
@@ -107,17 +142,63 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
         self, discovery_info: ZeroconfServiceInfo
     ) -> ConfigFlowResult:
         """Handle discovery by zeroconf."""
-        hostname = discovery_info.hostname.replace(".local.", "")
+        LOGGER.debug("Discovered via Zeroconf with info: %s", discovery_info)
+        hostname = (
+            discovery_info.hostname.replace(".local.", "").upper().replace("LAN_", "")
+        )
+        title = f"{hostname} ({discovery_info.ip_address})"
         await self.async_set_unique_id(hostname)
-        self._abort_if_unique_id_configured(updates={CONF_HOST: discovery_info.host})
+        self._abort_if_unique_id_configured(
+            updates={
+                CONF_HOST: discovery_info.host,
+                "title": title,
+            }
+        )
 
         # Check if config_entry exists already without unigue_id configured.
         for entry in self.hass.config_entries.async_entries(DOMAIN):
             if entry.data[CONF_HOST] == discovery_info.host and entry.unique_id is None:
                 self.hass.config_entries.async_update_entry(
-                    entry=entry, unique_id=hostname
+                    entry=entry,
+                    unique_id=hostname,
+                    title=title,
                 )
                 return self.async_abort(reason="already_configured")
 
-        self.hosts.append(VeluxHost(hostname=hostname, ip_address=discovery_info.host))
-        return await self.async_step_user()
+        if hostname not in [host.hostname for host in self.hosts]:
+            self.hosts.append(
+                VeluxHost(hostname=hostname, ip_address=discovery_info.host)
+            )
+
+        return await self.async_step_auth()
+
+    async def async_step_dhcp(
+        self, discovery_info: DhcpServiceInfo
+    ) -> ConfigFlowResult:
+        """Handle discovery by DHCP."""
+        LOGGER.debug("Discovered via DHCP with info: %s", discovery_info)
+        hostname = discovery_info.hostname.upper().replace("LAN_", "")
+        title = f"{hostname} ({discovery_info.ip})"
+        mac = format_mac(discovery_info.macaddress)
+        await self.async_set_unique_id(hostname)
+        self._abort_if_unique_id_configured(
+            updates={CONF_HOST: discovery_info.ip, "mac": mac},
+        )
+
+        # Check if config_entry exists already without unigue_id configured.
+        for entry in self.hass.config_entries.async_entries(DOMAIN):
+            if entry.data[CONF_HOST] == discovery_info.ip and entry.unique_id is None:
+                self.hass.config_entries.async_update_entry(
+                    entry=entry,
+                    unique_id=hostname,
+                    title=title,
+                    data={**entry.data, "mac": mac},
+                )
+                return self.async_abort(reason="already_configured")
+
+        if hostname not in [host.hostname for host in self.hosts]:
+            self.hosts.append(
+                VeluxHost(hostname=hostname, ip_address=discovery_info.ip)
+            )
+
+        return await self.async_step_auth()

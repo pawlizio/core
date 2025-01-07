@@ -5,6 +5,7 @@ from pyvlx import PyVLX, PyVLXException
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.helpers import device_registry as dr
 
 from .const import DOMAIN, LOGGER, PLATFORMS
 
@@ -59,6 +60,23 @@ class VeluxModule:
 
         self._hass.services.async_register(
             DOMAIN, "reboot_gateway", async_reboot_gateway
+        )
+
+        # Add bridge device to device registry
+        connections = set()
+        mac_address = self._domain_config.get(dr.CONNECTION_NETWORK_MAC)
+        if mac_address is not None:
+            connections = {(dr.CONNECTION_NETWORK_MAC, mac_address)}
+        device_registry = dr.async_get(self._hass)
+        device_registry.async_get_or_create(
+            config_entry_id=self._domain_config.entry_id,
+            identifiers={(DOMAIN, self._domain_config.unique_id)},
+            connections=connections,
+            manufacturer="Velux",
+            name=self._domain_config.unique_id,
+            model="KLF200",
+            hw_version=self.pyvlx.klf200.version.hardwareversion,
+            sw_version=self.pyvlx.klf200.version.softwareversion,
         )
 
     async def async_start(self):

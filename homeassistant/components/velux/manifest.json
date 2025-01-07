@@ -3,6 +3,12 @@
   "name": "Velux",
   "codeowners": ["@Julius2342", "@DeerMaximum", "@pawlizio"],
   "config_flow": true,
+  "dhcp": [
+    {
+      "hostname": "velux_klf_lan*",
+      "macaddress": "646184*"
+    }
+  ],
   "documentation": "https://www.home-assistant.io/integrations/velux",
   "integration_type": "hub",
   "iot_class": "local_polling",
