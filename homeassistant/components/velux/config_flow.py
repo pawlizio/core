@@ -159,7 +159,7 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
                 return self.async_abort(reason="already_configured")
 
-        if hostname not in [host.hostname for host in self.hosts]:
+        if not any(host.hostname == hostname for host in self.hosts):
             self.hosts.append(
                 VeluxHost(hostname=hostname, ip_address=discovery_info.host)
             )
@@ -172,7 +172,6 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
         """Handle discovery by DHCP."""
         LOGGER.debug("Discovered via DHCP with info: %s", discovery_info)
         hostname = discovery_info.hostname.upper().replace("LAN_", "")
-        title = f"{hostname} ({discovery_info.ip})"
         mac = format_mac(discovery_info.macaddress)
         await self.async_set_unique_id(hostname)
         self._abort_if_unique_id_configured(
@@ -185,12 +184,11 @@ class VeluxConfigFlow(ConfigFlow, domain=DOMAIN):
                 self.hass.config_entries.async_update_entry(
                     entry=entry,
                     unique_id=hostname,
-                    title=title,
                     data={**entry.data, "mac": mac},
                 )
                 return self.async_abort(reason="already_configured")
 
-        if hostname not in [host.hostname for host in self.hosts]:
+        if not any(host.hostname == hostname for host in self.hosts):
             self.hosts.append(
                 VeluxHost(hostname=hostname, ip_address=discovery_info.ip)
             )
