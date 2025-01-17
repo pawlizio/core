@@ -29,5 +29,12 @@
       "name": "Reboot gateway",
       "description": "Reboots the KLF200 Gateway."
     }
+  },
+  "entity": {
+    "button": {
+      "reboot": {
+        "name": "[%key:common::action::restart%]"
+      }
+    }
   }
 }
